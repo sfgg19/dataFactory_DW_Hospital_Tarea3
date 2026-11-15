@@ -1,0 +1,107 @@
+{
+	"name": "df_silver_billing",
+	"properties": {
+		"folder": {
+			"name": "df_silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_billing_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_billing_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "derivedColumn1"
+				},
+				{
+					"name": "derivedColumn2"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "aggregate1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          billing_id as string,",
+				"          admission_id as string,",
+				"          charge_type as string,",
+				"          amount as string,",
+				"          payment_status as string,",
+				"          payment_date as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(billing_id = iif(trim(billing_id) == '', toString(null()), trim(billing_id)),",
+				"          admission_id = iif(trim(admission_id) == '', toString(null()), trim(admission_id)),",
+				"          charge_type = iif(trim(charge_type) == '' || upper(trim(charge_type)) == 'N/A' || upper(trim(charge_type)) == 'UNKNOWN', toString(null()), trim(charge_type)),",
+				"          amount = iif(trim(amount) == '' || upper(trim(amount)) == 'N/A' || upper(trim(amount)) == 'UNKNOWN', toString(null()), trim(replace(replace(replace(upper(trim(amount)), 'USD', ''), '$', ''), ',', ''))),",
+				"          payment_status = iif(trim(payment_status) == '' || upper(trim(payment_status)) == 'N/A' || upper(trim(payment_status)) == 'UNKNOWN', toString(null()), initCap(lower(trim(payment_status)))),",
+				"          payment_date = iif(trim(payment_date) == '' || upper(trim(payment_date)) == 'N/A' || upper(trim(payment_date)) == 'UNKNOWN', toString(null()), trim(payment_date))) ~> derivedColumn1",
+				"derivedColumn1 derive(billing_id = toInteger(billing_id),",
+				"          admission_id = toInteger(admission_id),",
+				"          amount = toDecimal(amount, 12, 2),",
+				"          payment_date = coalesce(",
+				"               toDate(payment_date, 'yyyy-MM-dd'),",
+				"               toDate(payment_date, 'MM/dd/yyyy'),",
+				"               toDate(payment_date, 'dd-MMM-yyyy'),",
+				"               toDate(payment_date, 'MMMM dd, yyyy'),",
+				"               toDate(payment_date, 'MM-dd-yy')",
+				"          )) ~> derivedColumn2",
+				"derivedColumn2 split(!isNull(billing_id) && !isNull(admission_id) && !isNull(charge_type) && !isNull(amount) && amount > 0 && !isNull(payment_status),",
+				"     disjoint: false) ~> split1@(validos, rechazados)",
+				"split1@validos aggregate(groupBy(billing_id),",
+				"     admission_id = first(admission_id),",
+				"          charge_type = first(charge_type),",
+				"          amount = first(amount),",
+				"          payment_status = first(payment_status),",
+				"          payment_date = first(payment_date)) ~> aggregate1",
+				"aggregate1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          billing_id as integer,",
+				"          admission_id as integer,",
+				"          charge_type as string,",
+				"          amount as decimal(12,2),",
+				"          payment_status as string,",
+				"          payment_date as date",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          billing_id,",
+				"          admission_id,",
+				"          charge_type,",
+				"          amount,",
+				"          payment_status,",
+				"          payment_date",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}

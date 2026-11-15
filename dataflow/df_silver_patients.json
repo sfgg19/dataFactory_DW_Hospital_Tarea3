@@ -57,7 +57,7 @@
 				"          full_name = iif(trim(full_name) == '', toString(null()), trim(full_name)),",
 				"          gender = case(upper(trim(gender)) == 'M' || upper(trim(gender)) == 'MALE', 'M', upper(trim(gender)) == 'F' || upper(trim(gender)) == 'FEMALE', 'F', toString(null())),",
 				"          date_of_birth = iif(trim(date_of_birth) == '' || upper(trim(date_of_birth)) == 'N/A' || upper(trim(date_of_birth)) == 'UNKNOWN', toString(null()), trim(date_of_birth)),",
-				"          phone = iif(trim(phone) == '' || upper(trim(phone)) == 'N/A' || upper(trim(phone)) == 'UNKNOWN', toString(null()), trim(phone)),",
+				"          phone = iif(length(right(regexReplace(phone, '[^0-9]', ''), 10)) == 10, concat(substring(right(regexReplace(phone, '[^0-9]', ''), 10), 1, 3), '-', substring(right(regexReplace(phone, '[^0-9]', ''), 10), 4, 3), '-', substring(right(regexReplace(phone, '[^0-9]', ''), 10), 7, 4)), toString(null())),",
 				"          email = iif(trim(email) == '' || upper(trim(email)) == 'N/A' || upper(trim(email)) == 'UNKNOWN', toString(null()), replace(replace(replace(lower(trim(email)), ' at ', '@'), ',com', '.com'), 'gmial.com', 'gmail.com')),",
 				"          address = iif(trim(address) == '', toString(null()), trim(address)),",
 				"          insurance_provider = case(",

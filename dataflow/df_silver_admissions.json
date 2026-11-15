@@ -1,0 +1,138 @@
+{
+	"name": "df_silver_admissions",
+	"properties": {
+		"folder": {
+			"name": "df_silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_admissions_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				},
+				{
+					"dataset": {
+						"referenceName": "dw_silver_patients_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source2"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_admissions_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "derivedColumn1"
+				},
+				{
+					"name": "derivedColumn2"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "aggregate1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          admission_id as string,",
+				"          patient_id as string,",
+				"          admission_date as string,",
+				"          discharge_date as string,",
+				"          department as string,",
+				"          attending_doctor_id as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source(output(",
+				"          patient_id as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source2",
+				"source1 derive(admission_id = iif(trim(admission_id) == '', toString(null()), trim(admission_id)),",
+				"          patient_id = iif(trim(patient_id) == '', toString(null()), trim(patient_id)),",
+				"          admission_date = iif(trim(admission_date) == '' || upper(trim(admission_date)) == 'N/A' || upper(trim(admission_date)) == 'UNKNOWN', toString(null()), trim(admission_date)),",
+				"          discharge_date = iif(trim(discharge_date) == '' || upper(trim(discharge_date)) == 'N/A' || upper(trim(discharge_date)) == 'UNKNOWN', toString(null()), trim(discharge_date)),",
+				"          department = case(",
+				"               trim(department) == '' || upper(trim(department)) == 'N/A' || upper(trim(department)) == 'UNKNOWN', toString(null()),",
+				"               in(['cardiology', 'cardio', 'cardiolgy'], lower(trim(department))), 'Cardiology',",
+				"               in(['emergency', 'er', 'emergancy'], lower(trim(department))), 'Emergency',",
+				"               in(['general surgery', 'generalsurgery', 'gen surg'], lower(trim(department))), 'General Surgery',",
+				"               in(['neurology', 'neuro', 'nuerology'], lower(trim(department))), 'Neurology',",
+				"               in(['oncology', 'onco', 'oncologyy'], lower(trim(department))), 'Oncology',",
+				"               in(['orthopedics', 'orthopaedics', 'ortho'], lower(trim(department))), 'Orthopedics',",
+				"               in(['pediatrics', 'paediatrics', 'peds'], lower(trim(department))), 'Pediatrics',",
+				"               trim(department)",
+				"          ),",
+				"          attending_doctor_id = iif(trim(attending_doctor_id) == '', toString(null()), trim(attending_doctor_id))) ~> derivedColumn1",
+				"derivedColumn1 derive(admission_id = toInteger(admission_id),",
+				"          patient_id = toInteger(patient_id),",
+				"          admission_date = coalesce(",
+				"               toDate(admission_date, 'yyyy-MM-dd'),",
+				"               toDate(admission_date, 'MM/dd/yyyy'),",
+				"               toDate(admission_date, 'dd-MMM-yyyy'),",
+				"               toDate(admission_date, 'MMMM dd, yyyy'),",
+				"               toDate(admission_date, 'MM-dd-yy')",
+				"          ),",
+				"          discharge_date = coalesce(",
+				"               toDate(discharge_date, 'yyyy-MM-dd'),",
+				"               toDate(discharge_date, 'MM/dd/yyyy'),",
+				"               toDate(discharge_date, 'dd-MMM-yyyy'),",
+				"               toDate(discharge_date, 'MMMM dd, yyyy'),",
+				"               toDate(discharge_date, 'MM-dd-yy')",
+				"          ),",
+				"          attending_doctor_id = toInteger(attending_doctor_id)) ~> derivedColumn2",
+				"derivedColumn2 split(!isNull(admission_id) && !isNull(patient_id) && !isNull(admission_date) && !isNull(department) && !isNull(attending_doctor_id) && (isNull(discharge_date) || discharge_date >= admission_date),",
+				"     disjoint: false) ~> split1@(validos, rechazados)",
+				"split1@validos aggregate(groupBy(admission_id),",
+				"     patient_id = first(patient_id),",
+				"          admission_date = first(admission_date),",
+				"          discharge_date = first(discharge_date),",
+				"          department = first(department),",
+				"          attending_doctor_id = first(attending_doctor_id)) ~> aggregate1",
+				"aggregate1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          admission_id as integer,",
+				"          patient_id as integer,",
+				"          admission_date as date,",
+				"          discharge_date as date,",
+				"          department as string,",
+				"          attending_doctor_id as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          admission_id,",
+				"          patient_id,",
+				"          admission_date,",
+				"          discharge_date,",
+				"          department,",
+				"          attending_doctor_id",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}

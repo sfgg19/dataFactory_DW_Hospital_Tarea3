@@ -1,0 +1,94 @@
+{
+	"name": "df_silver_diagnoses",
+	"properties": {
+		"folder": {
+			"name": "df_silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_diagnoses_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_diagnoses_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "derivedColumn1"
+				},
+				{
+					"name": "derivedColumn2"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "aggregate1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          diagnosis_id as string,",
+				"          admission_id as string,",
+				"          icd_code as string,",
+				"          diagnosis_description as string,",
+				"          severity as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(diagnosis_id = iif(trim(diagnosis_id) == '', toString(null()), trim(diagnosis_id)),",
+				"          admission_id = iif(trim(admission_id) == '', toString(null()), trim(admission_id)),",
+				"          icd_code = iif(trim(icd_code) == '' || upper(trim(icd_code)) == 'N/A' || upper(trim(icd_code)) == 'UNKNOWN', toString(null()), regexReplace(regexReplace(replace(upper(trim(icd_code)), '-', '.'), '\\\\s*,\\\\s*', ', '), '([A-Z][0-9]{2})([0-9A-Z]+)', '$1.$2')),",
+				"          diagnosis_description = iif(trim(diagnosis_description) == '', toString(null()), trim(diagnosis_description)),",
+				"          severity = iif(trim(severity) == '' || upper(trim(severity)) == 'N/A' || upper(trim(severity)) == 'UNKNOWN', toString(null()), initCap(lower(trim(severity))))) ~> derivedColumn1",
+				"derivedColumn1 derive(diagnosis_id = toInteger(diagnosis_id),",
+				"          admission_id = toInteger(admission_id)) ~> derivedColumn2",
+				"derivedColumn2 split(!isNull(diagnosis_id) && !isNull(admission_id) && !isNull(icd_code),",
+				"     disjoint: false) ~> split1@(validos, rechazados)",
+				"split1@validos aggregate(groupBy(diagnosis_id),",
+				"     admission_id = first(admission_id),",
+				"          icd_code = first(icd_code),",
+				"          diagnosis_description = first(diagnosis_description),",
+				"          severity = first(severity)) ~> aggregate1",
+				"aggregate1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          diagnosis_id as integer,",
+				"          admission_id as integer,",
+				"          icd_code as string,",
+				"          diagnosis_description as string,",
+				"          severity as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          diagnosis_id,",
+				"          admission_id,",
+				"          icd_code,",
+				"          diagnosis_description,",
+				"          severity",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}
