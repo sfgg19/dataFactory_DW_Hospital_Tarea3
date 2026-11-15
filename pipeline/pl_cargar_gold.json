@@ -1,0 +1,251 @@
+{
+	"name": "pl_cargar_gold",
+	"properties": {
+		"activities": [
+			{
+				"name": "Limpiar_Gold",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "sql_dw_hospital",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": "DELETE FROM gold.fact_facturacion;\nDELETE FROM gold.fact_admisiones;\nDELETE FROM gold.dim_diagnostico;\nDELETE FROM gold.dim_servicio_cargo;\nDELETE FROM gold.dim_departamento;\nDELETE FROM gold.dim_paciente;\nDELETE FROM gold.dim_fecha;\n\nDBCC CHECKIDENT ('gold.dim_paciente', RESEED, 0);\nDBCC CHECKIDENT ('gold.dim_departamento', RESEED, 0);\nDBCC CHECKIDENT ('gold.dim_diagnostico', RESEED, 0);\nDBCC CHECKIDENT ('gold.dim_servicio_cargo', RESEED, 0);\nDBCC CHECKIDENT ('gold.fact_admisiones', RESEED, 0);\nDBCC CHECKIDENT ('gold.fact_facturacion', RESEED, 0);"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Cargar_Dim_Fecha",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Limpiar_Gold",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_gold_dim_fecha",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "Cargar_Dim_Paciente",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Cargar_Dim_Fecha",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_gold_dim_paciente",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "Cargar_Dim_Departamento",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Cargar_Dim_Paciente",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_gold_dim_departamento",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "Cargar_Dim_Diagnostico",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Cargar_Dim_Departamento",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_gold_dim_diagnostico",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "Cargar_Dim_Servicio_Cargo",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Cargar_Dim_Diagnostico",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_gold_dim_servicio_cargo",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "Cargar_Fact_Admisiones",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Cargar_Dim_Servicio_Cargo",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_gold_fact_admisiones",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "Cargar_Fact_Facturacion",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Cargar_Fact_Admisiones",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_gold_fact_facturacion",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			}
+		],
+		"annotations": []
+	}
+}
