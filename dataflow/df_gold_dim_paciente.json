@@ -1,0 +1,94 @@
+{
+	"name": "df_gold_dim_paciente",
+	"properties": {
+		"folder": {
+			"name": "df_gold"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_patients_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_gold_dim_paciente_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "select1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          patient_id_bk as integer,",
+				"          nombre_completo as string,",
+				"          genero as string,",
+				"          fecha_nacimiento as date,",
+				"          rango_etario as string,",
+				"          correo_electronico as string,",
+				"          direccion as string,",
+				"          proveedor_seguro as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT CAST(patient_id AS INT) AS patient_id_bk, CAST(full_name AS NVARCHAR(250)) AS nombre_completo, CAST(CASE WHEN gender = \\'M\\' THEN \\'Masculino\\' WHEN gender = \\'F\\' THEN \\'Femenino\\' ELSE \\'Otro\\' END AS VARCHAR(20)) AS genero, CAST(date_of_birth AS DATE) AS fecha_nacimiento, CAST(CASE WHEN date_of_birth IS NULL THEN NULL WHEN DATEDIFF(YEAR, date_of_birth, GETDATE()) <= 18 THEN \\'0-18\\' WHEN DATEDIFF(YEAR, date_of_birth, GETDATE()) <= 35 THEN \\'19-35\\' WHEN DATEDIFF(YEAR, date_of_birth, GETDATE()) <= 60 THEN \\'36-60\\' ELSE \\'60+\\' END AS VARCHAR(50)) AS rango_etario, CAST(email AS VARCHAR(255)) AS correo_electronico, CAST(address AS NVARCHAR(500)) AS direccion, CAST(COALESCE(insurance_provider, N\\'Sin Seguro\\') AS NVARCHAR(150)) AS proveedor_seguro FROM silver.patients UNION ALL SELECT CAST(-1 AS INT) AS patient_id_bk, CAST(N\\'Paciente Desconocido\\' AS NVARCHAR(250)) AS nombre_completo, CAST(\\'Otro\\' AS VARCHAR(20)) AS genero, CAST(NULL AS DATE) AS fecha_nacimiento, CAST(NULL AS VARCHAR(50)) AS rango_etario, CAST(NULL AS VARCHAR(255)) AS correo_electronico, CAST(NULL AS NVARCHAR(500)) AS direccion, CAST(N\\'Sin Seguro\\' AS NVARCHAR(150)) AS proveedor_seguro',",
+				"     format: 'query') ~> source1",
+				"source1 select(mapColumn(",
+				"          patient_id_bk,",
+				"          nombre_completo,",
+				"          genero,",
+				"          fecha_nacimiento,",
+				"          rango_etario,",
+				"          correo_electronico,",
+				"          direccion,",
+				"          proveedor_seguro",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select1",
+				"select1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          paciente_key as integer,",
+				"          patient_id_bk as integer,",
+				"          nombre_completo as string,",
+				"          genero as string,",
+				"          fecha_nacimiento as date,",
+				"          rango_etario as string,",
+				"          correo_electronico as string,",
+				"          direccion as string,",
+				"          proveedor_seguro as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          patient_id_bk,",
+				"          nombre_completo,",
+				"          genero,",
+				"          fecha_nacimiento,",
+				"          rango_etario,",
+				"          correo_electronico,",
+				"          direccion,",
+				"          proveedor_seguro",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}

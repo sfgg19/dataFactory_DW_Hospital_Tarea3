@@ -1,0 +1,94 @@
+{
+	"name": "df_gold_fact_facturacion",
+	"properties": {
+		"folder": {
+			"name": "df_gold"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_billing_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_gold_fact_facturacion_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "select1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          billing_id_bk as integer,",
+				"          admission_id_bk as integer,",
+				"          paciente_key as integer,",
+				"          departamento_key as integer,",
+				"          servicio_cargo_key as integer,",
+				"          fecha_pago_key as integer,",
+				"          monto_facturado as decimal(12,2),",
+				"          conteo_transacciones as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT CAST(b.billing_id AS INT) AS billing_id_bk, CAST(b.admission_id AS INT) AS admission_id_bk, CAST(COALESCE(dp.paciente_key, pd.paciente_key, 1) AS INT) AS paciente_key, CAST(COALESCE(dd.departamento_key, depd.departamento_key, 1) AS INT) AS departamento_key, CAST(COALESCE(dsc.servicio_cargo_key, 1) AS INT) AS servicio_cargo_key, CAST(CASE WHEN b.payment_date IS NOT NULL THEN CONVERT(VARCHAR(8), b.payment_date, 112) ELSE NULL END AS INT) AS fecha_pago_key, CAST(b.amount AS DECIMAL(12, 2)) AS monto_facturado, CAST(1 AS INT) AS conteo_transacciones FROM silver.billing b LEFT JOIN (SELECT TOP 1 paciente_key FROM gold.dim_paciente WHERE patient_id_bk = -1) pd ON 1 = 1 LEFT JOIN (SELECT TOP 1 departamento_key FROM gold.dim_departamento WHERE nombre_departamento = N\\'Sin Departamento\\') depd ON 1 = 1 LEFT JOIN silver.admissions a ON b.admission_id = a.admission_id LEFT JOIN gold.dim_paciente dp ON a.patient_id = dp.patient_id_bk LEFT JOIN gold.dim_departamento dd ON a.department = dd.nombre_departamento LEFT JOIN gold.dim_servicio_cargo dsc ON b.charge_type = dsc.tipo_cargo AND b.payment_status = dsc.estado_pago',",
+				"     format: 'query') ~> source1",
+				"source1 select(mapColumn(",
+				"          billing_id_bk,",
+				"          admission_id_bk,",
+				"          paciente_key,",
+				"          departamento_key,",
+				"          servicio_cargo_key,",
+				"          fecha_pago_key,",
+				"          monto_facturado,",
+				"          conteo_transacciones",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select1",
+				"select1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          facturacion_key as long,",
+				"          billing_id_bk as integer,",
+				"          admission_id_bk as integer,",
+				"          paciente_key as integer,",
+				"          departamento_key as integer,",
+				"          servicio_cargo_key as integer,",
+				"          fecha_pago_key as integer,",
+				"          monto_facturado as decimal(12,2),",
+				"          conteo_transacciones as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          billing_id_bk,",
+				"          admission_id_bk,",
+				"          paciente_key,",
+				"          departamento_key,",
+				"          servicio_cargo_key,",
+				"          fecha_pago_key,",
+				"          monto_facturado,",
+				"          conteo_transacciones",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}

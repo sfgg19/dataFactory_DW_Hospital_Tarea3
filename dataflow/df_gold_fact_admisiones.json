@@ -1,0 +1,98 @@
+{
+	"name": "df_gold_fact_admisiones",
+	"properties": {
+		"folder": {
+			"name": "df_gold"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_admissions_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_gold_fact_admisiones_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "select1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          admission_id_bk as integer,",
+				"          paciente_key as integer,",
+				"          departamento_key as integer,",
+				"          diagnostico_key as integer,",
+				"          fecha_ingreso_key as integer,",
+				"          fecha_alta_key as integer,",
+				"          medico_id as integer,",
+				"          dias_estancia as integer,",
+				"          conteo_admisiones as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT CAST(a.admission_id AS INT) AS admission_id_bk, CAST(COALESCE(dp.paciente_key, pd.paciente_key, 1) AS INT) AS paciente_key, CAST(COALESCE(dd.departamento_key, 1) AS INT) AS departamento_key, CAST(COALESCE(ddiag.diagnostico_key, dgd.diagnostico_key, 1) AS INT) AS diagnostico_key, CAST(CONVERT(VARCHAR(8), a.admission_date, 112) AS INT) AS fecha_ingreso_key, CAST(CASE WHEN a.discharge_date IS NOT NULL THEN CONVERT(VARCHAR(8), a.discharge_date, 112) ELSE NULL END AS INT) AS fecha_alta_key, CAST(a.attending_doctor_id AS INT) AS medico_id, CAST(CASE WHEN a.discharge_date IS NOT NULL THEN DATEDIFF(DAY, a.admission_date, a.discharge_date) ELSE NULL END AS INT) AS dias_estancia, CAST(1 AS INT) AS conteo_admisiones FROM silver.admissions a LEFT JOIN (SELECT TOP 1 paciente_key FROM gold.dim_paciente WHERE patient_id_bk = -1) pd ON 1 = 1 LEFT JOIN (SELECT TOP 1 diagnostico_key FROM gold.dim_diagnostico WHERE codigo_icd = \\'SIN_DIAG\\') dgd ON 1 = 1 LEFT JOIN gold.dim_paciente dp ON a.patient_id = dp.patient_id_bk LEFT JOIN gold.dim_departamento dd ON a.department = dd.nombre_departamento LEFT JOIN (SELECT d.admission_id, d.icd_code, COALESCE(d.diagnosis_description, N\\'Sin descripción\\') AS diagnosis_description, COALESCE(d.severity, \\'No Especificada\\') AS severity, ROW_NUMBER() OVER (PARTITION BY d.admission_id ORDER BY CASE COALESCE(d.severity, \\'No Especificada\\') WHEN \\'Critical\\' THEN 1 WHEN \\'Severe\\' THEN 2 WHEN \\'Moderate\\' THEN 3 WHEN \\'Mild\\' THEN 4 ELSE 5 END, d.diagnosis_id ASC) AS rn FROM silver.diagnoses d) dpr ON a.admission_id = dpr.admission_id AND dpr.rn = 1 LEFT JOIN gold.dim_diagnostico ddiag ON dpr.icd_code = ddiag.codigo_icd AND dpr.diagnosis_description = ddiag.descripcion_patologia AND dpr.severity = ddiag.nivel_severidad',",
+				"     format: 'query') ~> source1",
+				"source1 select(mapColumn(",
+				"          admission_id_bk,",
+				"          paciente_key,",
+				"          departamento_key,",
+				"          diagnostico_key,",
+				"          fecha_ingreso_key,",
+				"          fecha_alta_key,",
+				"          medico_id,",
+				"          dias_estancia,",
+				"          conteo_admisiones",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select1",
+				"select1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          admision_key as long,",
+				"          admission_id_bk as integer,",
+				"          paciente_key as integer,",
+				"          departamento_key as integer,",
+				"          diagnostico_key as integer,",
+				"          fecha_ingreso_key as integer,",
+				"          fecha_alta_key as integer,",
+				"          medico_id as integer,",
+				"          dias_estancia as integer,",
+				"          conteo_admisiones as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          admission_id_bk,",
+				"          paciente_key,",
+				"          departamento_key,",
+				"          diagnostico_key,",
+				"          fecha_ingreso_key,",
+				"          fecha_alta_key,",
+				"          medico_id,",
+				"          dias_estancia,",
+				"          conteo_admisiones",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}
